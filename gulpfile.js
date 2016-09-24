@@ -1,10 +1,13 @@
 'use strict';
 
+var babelify = require("babelify");
+var browserify = require('browserify');
 var clean = require('gulp-clean')
 var concat = require('gulp-concat')
 var connect = require('gulp-connect');
 var gulp = require('gulp');
-var htmlhint = require("gulp-htmlhint");
+var gutil = require('gulp-util');
+var htmlhint = require('gulp-htmlhint');
 var inject = require('gulp-inject');
 var jshint = require('gulp-jshint');
 var livereload = require('gulp-livereload');
@@ -12,6 +15,7 @@ var lr = require('tiny-lr');
 var open = require('gulp-open');
 var sass = require('gulp-sass');
 var stylish = require('jshint-stylish');
+var vinyl = require('vinyl-source-stream')
 var watch = require('gulp-watch');
 var server = lr();
 
@@ -28,44 +32,41 @@ var browser = 'firefox';
 gulp.task('sass', function() {
     return gulp.src(sassFiles)
         .pipe(sass().on('error', sass.logError))
-        .pipe(gulp.dest(target + trgCss))
-        .pipe(connect.reload());
+        .pipe(gulp.dest(target + trgCss));
 });
 gulp.task('js', function() {
-    gulp.src([jsFiles])
-        .pipe(jshint())
-        .pipe(jshint.reporter('jshint-stylish'))
-        // .pipe(jshint.reporter('fail'))
-        .pipe(concat('index.js'))
-        .pipe(gulp.dest(target + trgJs))
-        .pipe(connect.reload());
+    return  browserify(webapp + '/app/app.js')
+    .transform("babelify", {
+        presets: ["es2015"],
+        plugins: ['inferno', 'syntax-jsx']
+    })
+    .bundle()
+        .pipe(vinyl('bundle.js'))
+        .pipe(gulp.dest(target));
 });
 gulp.task('html', function() {
-    gulp.src(htmlFiles)
+    return gulp.src(htmlFiles)
         .pipe(htmlhint())
-        .pipe(htmlhint.failReporter())
-        .pipe(connect.reload());
+        .pipe(htmlhint.failReporter());
 });
 
-gulp.task('build', ['sass', 'js', 'html']);
+gulp.task('build', ['sass', 'html', 'js']);
 
 gulp.task('index', ['build'], function() {
-    console.log('index rebuilded');
     var html = gulp.src(webapp + '/index.html');
     // It's not necessary to read the files (will speed up things), we're only after their paths:
-    var sources = gulp.src([target + trgJs + "/**/*.js", target + trgCss + "/**/*.css"], {
+    var sources = gulp.src([target + '/bundle.js', target + trgCss + '/**/*.css'], {
         read: false
     });
     return html.pipe(inject(sources, {
             ignorePath: '/target/'
         }))
-        .pipe(gulp.dest(target));
+        .pipe(gulp.dest(target)).pipe(connect.reload());
 });
 
-gulp.task('watch', function() {
+gulp.task('watch',  function() {
     watch([sassFiles, jsFiles, htmlFiles], function(event) {
         gulp.start('index');
-        console.log('File ' + event.path + ' was ' + event.type + ', running tasks...');
     });
 });
 
@@ -78,7 +79,7 @@ gulp.task('connect', function() {
 });
 
 gulp.task('clean', function() {
-    return gulp.src(target + "/**", {
+    return gulp.src(target + '/**', {
             read: false
         })
         .pipe(clean({
@@ -95,4 +96,6 @@ gulp.task('app', function() {
         .pipe(open(options));
 });
 
-gulp.task('default', ['watch', 'index', 'connect', 'app']);
+gulp.task('default', ['connect', 'index', 'watch'], function() {
+    gulp.start('app');
+});
