@@ -1,6 +1,6 @@
 #!/bin/sh
 mkdir webapp
-mkdir webapp/scss
+mkdir webapp/sass
 mkdir webapp/app
 
 touch gulpfile.js
@@ -17,5 +17,6 @@ npm install -D \
   gulp-livereload \
   gulp-open \
   gulp-sass \
+  gulp-watch \
   jshint-stylish \
-  tiny-lr 
+  tiny-lr
